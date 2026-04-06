@@ -1,0 +1,54 @@
+version: 2
+
+project_name: backrest-config-backup
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: backup-agent
+    main: ./cmd/backup-agent
+    binary: backup-agent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/FrostWalk/backrest-config-backup/internal/version.Version={{ .Version }}
+        -X github.com/FrostWalk/backrest-config-backup/internal/version.Revision={{ .Commit }}
+        -X github.com/FrostWalk/backrest-config-backup/internal/version.BuildDate={{ .Date }}
+
+archives:
+  - id: backup-agent-archive
+    ids:
+      - backup-agent
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "{{ .ProjectName }} v{{ .Version }}"
