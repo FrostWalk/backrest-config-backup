@@ -17,14 +17,29 @@ import (
 	"github.com/FrostWalk/backrest-config-backup/internal/config"
 	"github.com/FrostWalk/backrest-config-backup/internal/domain/backup"
 	"github.com/FrostWalk/backrest-config-backup/internal/observability"
+	"github.com/FrostWalk/backrest-config-backup/internal/version"
 	"go.uber.org/zap"
 )
 
 func main() {
+	if printVersion() {
+		return
+	}
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "fatal: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func printVersion() bool {
+	for _, a := range os.Args[1:] {
+		switch a {
+		case "-version", "--version", "-v":
+			fmt.Printf("backup-agent %s\n  commit: %s\n  built:  %s\n", version.Version, version.Revision, version.BuildDate)
+			return true
+		}
+	}
+	return false
 }
 
 func run() error {
@@ -35,6 +50,13 @@ func run() error {
 	defer func() {
 		_ = observability.SyncLogger(logger)
 	}()
+
+	logger.Info(
+		"backup-agent",
+		zap.String("version", version.Version),
+		zap.String("revision", version.Revision),
+		zap.String("build_date", version.BuildDate),
+	)
 
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
