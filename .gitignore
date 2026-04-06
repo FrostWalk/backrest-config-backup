@@ -1,0 +1,9 @@
+/bin/
+/dist/
+/tmp/
+/.env
+/.DS_Store
+config.json
+.env.dev
+age_passphrase.txt
+.idea
