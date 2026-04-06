@@ -57,3 +57,20 @@ func TestLoadFromEnvRunOnceBypassesCronRequirement(t *testing.T) {
 		t.Fatalf("expected RunOnce true")
 	}
 }
+
+func TestLoadFromEnvHealthchecksOptional(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "/data/config.json")
+	t.Setenv("S3_BUCKET", "bucket")
+	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("AGE_PASSPHRASE_FILE", "/run/secrets/age_passphrase")
+	t.Setenv("CRON_SCHEDULE", "*/5 * * * *")
+	t.Setenv("HEALTHCHECKS_URL", "")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.HealthchecksURL != "" {
+		t.Fatalf("expected empty HEALTHCHECKS_URL, got %q", cfg.HealthchecksURL)
+	}
+}

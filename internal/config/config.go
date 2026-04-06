@@ -75,8 +75,6 @@ func (c Config) validate() error {
 		return errors.New("S3_BUCKET is required")
 	case !c.RunOnce && strings.TrimSpace(c.CronSchedule) == "":
 		return errors.New("CRON_SCHEDULE is required")
-	case strings.TrimSpace(c.HealthchecksURL) == "":
-		return errors.New("HEALTHCHECKS_URL is required")
 	case strings.TrimSpace(c.ConfigPath) == "":
 		return errors.New("CONFIG_PATH is required")
 	case strings.TrimSpace(c.S3Endpoint) == "":

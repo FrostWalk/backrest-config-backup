@@ -115,7 +115,7 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 }
 
 func (s *Service) buildBackupObjectKey(now time.Time) string {
-	filename := "config-backup-" + now.Format("2006-01-02T15-04-05.000Z07-00") + ".json.age"
+	filename := "config-backup-" + now.Format("2006-01-02T15-04-05") + ".json.age"
 	if s.keyPrefix == "" {
 		return filename
 	}

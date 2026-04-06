@@ -99,6 +99,10 @@ func run() error {
 
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	notifier := healthchecks.NewNotifier(httpClient, cfg.HealthchecksURL)
+	healthchecksEnabled := cfg.HealthchecksURL != ""
+	if !healthchecksEnabled {
+		logger.Info("healthchecks disabled; HEALTHCHECKS_URL not set")
+	}
 	cronScheduler := scheduler.NewCronScheduler(location, logger)
 
 	job := func(runParent context.Context) error {
@@ -118,10 +122,12 @@ func run() error {
 				fields = append(fields, zap.Time("next_backup_at", nextRun))
 			}
 			logger.Error("backup run failed", fields...)
-			pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancelPing()
-			if pingErr := notifier.PingFailure(pingCtx, err.Error()); pingErr != nil {
-				logger.Error("failure ping failed", zap.Error(pingErr))
+			if healthchecksEnabled {
+				pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancelPing()
+				if pingErr := notifier.PingFailure(pingCtx, err.Error()); pingErr != nil {
+					logger.Error("failure ping failed", zap.Error(pingErr))
+				}
 			}
 			return err
 		}
@@ -139,11 +145,13 @@ func run() error {
 		}
 		logger.Info("backup run succeeded", fields...)
 
-		pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancelPing()
-		if pingErr := notifier.PingSuccess(pingCtx); pingErr != nil {
-			logger.Error("success ping failed", zap.Error(pingErr))
-			return pingErr
+		if healthchecksEnabled {
+			pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelPing()
+			if pingErr := notifier.PingSuccess(pingCtx); pingErr != nil {
+				logger.Error("success ping failed", zap.Error(pingErr))
+				return pingErr
+			}
 		}
 		return nil
 	}
