@@ -23,17 +23,13 @@ FROM alpine:latest
 ARG VERSION=dev
 ARG REVISION=unknown
 
-LABEL org.opencontainers.image.title="Backrest Config Backup" \
-      org.opencontainers.image.description="Encrypted client-side backups of Backrest config.json to S3-compatible storage." \
-      org.opencontainers.image.url="https://github.com/FrostWalk/backrest-config-backup" \
-      org.opencontainers.image.documentation="https://github.com/FrostWalk/backrest-config-backup" \
-      org.opencontainers.image.source="https://github.com/FrostWalk/backrest-config-backup" \
-      org.opencontainers.image.vendor="FrostWalk" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.revision="${REVISION}" \
-      org.opencontainers.image.os="linux" \
-      org.opencontainers.image.architecture="amd64"
+LABEL org.opencontainers.image.title="backrest-config-backup"
+LABEL org.opencontainers.image.description="Encrypted client-side backups of Backrest config.json to S3-compatible storage."
+LABEL org.opencontainers.image.licenses=MIT
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+LABEL org.opencontainers.image.os=linux
+LABEL org.opencontainers.image.architecture=amd64
 
 RUN apk add --no-cache ca-certificates tzdata
 
