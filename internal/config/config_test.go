@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -8,6 +9,8 @@ func TestLoadFromEnvRequiresCriticalValues(t *testing.T) {
 	t.Setenv("CONFIG_PATH", "")
 	t.Setenv("S3_BUCKET", "")
 	t.Setenv("S3_ENDPOINT", "")
+	t.Setenv("S3_ACCESS_KEY_ID", "")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "")
 	t.Setenv("AGE_PASSPHRASE_FILE", "")
 	t.Setenv("CRON_SCHEDULE", "")
 	t.Setenv("HEALTHCHECKS_URL", "")
@@ -22,6 +25,8 @@ func TestLoadFromEnvDefaultsAndNormalization(t *testing.T) {
 	t.Setenv("CONFIG_PATH", "/data/config.json")
 	t.Setenv("S3_BUCKET", "bucket")
 	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("S3_ACCESS_KEY_ID", "key-id")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
 	t.Setenv("AGE_PASSPHRASE_FILE", "/run/secrets/age_passphrase")
 	t.Setenv("CRON_SCHEDULE", "*/5 * * * *")
 	t.Setenv("HEALTHCHECKS_URL", "https://hc-ping.com/uuid")
@@ -44,6 +49,8 @@ func TestLoadFromEnvRunOnceBypassesCronRequirement(t *testing.T) {
 	t.Setenv("CONFIG_PATH", "/data/config.json")
 	t.Setenv("S3_BUCKET", "bucket")
 	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("S3_ACCESS_KEY_ID", "key-id")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
 	t.Setenv("AGE_PASSPHRASE_FILE", "/run/secrets/age_passphrase")
 	t.Setenv("CRON_SCHEDULE", "")
 	t.Setenv("HEALTHCHECKS_URL", "https://hc-ping.com/uuid")
@@ -62,6 +69,8 @@ func TestLoadFromEnvHealthchecksOptional(t *testing.T) {
 	t.Setenv("CONFIG_PATH", "/data/config.json")
 	t.Setenv("S3_BUCKET", "bucket")
 	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("S3_ACCESS_KEY_ID", "key-id")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
 	t.Setenv("AGE_PASSPHRASE_FILE", "/run/secrets/age_passphrase")
 	t.Setenv("CRON_SCHEDULE", "*/5 * * * *")
 	t.Setenv("HEALTHCHECKS_URL", "")
@@ -72,5 +81,28 @@ func TestLoadFromEnvHealthchecksOptional(t *testing.T) {
 	}
 	if cfg.HealthchecksURL != "" {
 		t.Fatalf("expected empty HEALTHCHECKS_URL, got %q", cfg.HealthchecksURL)
+	}
+}
+
+func TestLoadFromEnvRequiresS3StaticCredentials(t *testing.T) {
+	t.Setenv("CONFIG_PATH", "/data/config.json")
+	t.Setenv("S3_BUCKET", "bucket")
+	t.Setenv("S3_ENDPOINT", "https://s3.example.com")
+	t.Setenv("S3_ACCESS_KEY_ID", "")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
+	t.Setenv("AGE_PASSPHRASE_FILE", "/run/secrets/age_passphrase")
+	t.Setenv("CRON_SCHEDULE", "*/5 * * * *")
+
+	_, err := LoadFromEnv()
+	if err == nil || !strings.Contains(err.Error(), "S3_ACCESS_KEY_ID is required") {
+		t.Fatalf("expected S3_ACCESS_KEY_ID required error, got: %v", err)
+	}
+
+	t.Setenv("S3_ACCESS_KEY_ID", "key-id")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "")
+
+	_, err = LoadFromEnv()
+	if err == nil || !strings.Contains(err.Error(), "S3_SECRET_ACCESS_KEY is required") {
+		t.Fatalf("expected S3_SECRET_ACCESS_KEY required error, got: %v", err)
 	}
 }

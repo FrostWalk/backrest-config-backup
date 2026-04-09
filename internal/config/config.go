@@ -21,6 +21,9 @@ type Config struct {
 	S3Prefix          string
 	S3Region          string
 	S3Endpoint        string
+	S3AccessKeyID     string
+	S3SecretAccessKey string
+	S3SessionToken    string
 	AgePassphraseFile string
 	CronSchedule      string
 	Timezone          string
@@ -36,6 +39,9 @@ func LoadFromEnv() (Config, error) {
 		S3Prefix:          normalizePrefix(os.Getenv("S3_PREFIX")),
 		S3Region:          envOrDefault("AWS_REGION", defaultS3Region),
 		S3Endpoint:        strings.TrimSpace(os.Getenv("S3_ENDPOINT")),
+		S3AccessKeyID:     strings.TrimSpace(os.Getenv("S3_ACCESS_KEY_ID")),
+		S3SecretAccessKey: strings.TrimSpace(os.Getenv("S3_SECRET_ACCESS_KEY")),
+		S3SessionToken:    strings.TrimSpace(os.Getenv("S3_SESSION_TOKEN")),
 		AgePassphraseFile: strings.TrimSpace(os.Getenv("AGE_PASSPHRASE_FILE")),
 		CronSchedule:      strings.TrimSpace(os.Getenv("CRON_SCHEDULE")),
 		Timezone:          envOrDefault("TZ", defaultTimezone),
@@ -79,6 +85,10 @@ func (c Config) validate() error {
 		return errors.New("CONFIG_PATH is required")
 	case strings.TrimSpace(c.S3Endpoint) == "":
 		return errors.New("S3_ENDPOINT is required")
+	case strings.TrimSpace(c.S3AccessKeyID) == "":
+		return errors.New("S3_ACCESS_KEY_ID is required")
+	case strings.TrimSpace(c.S3SecretAccessKey) == "":
+		return errors.New("S3_SECRET_ACCESS_KEY is required")
 	case strings.TrimSpace(c.AgePassphraseFile) == "":
 		return errors.New("AGE_PASSPHRASE_FILE is required")
 	case strings.TrimSpace(c.Timezone) == "":

@@ -1,37 +1,15 @@
 services:
   backrest-config-backup:
-    platform: linux/amd64
+    container_name: backrest-config-backup
     image: ghcr.io/frostwalk/backrest-config-backup:latest
-    restart: unless-stopped
-    user: "${BACKREST_UID:-0}:${BACKREST_GID:-0}"
-    env_file:
-      - .env
-    environment:
-      CONFIG_PATH: "${CONFIG_PATH:-/data/config.json}"
-      S3_BUCKET: "${S3_BUCKET}"
-      S3_PREFIX: "${S3_PREFIX:-backrest}"
-      AWS_REGION: "${AWS_REGION:-us-east-1}"
-      S3_ENDPOINT: "${S3_ENDPOINT}"
-      AGE_PASSPHRASE_FILE: "${AGE_PASSPHRASE_FILE:-/run/secrets/age_passphrase}"
-      CRON_SCHEDULE: "${CRON_SCHEDULE:-*/30 * * * *}"
-      TZ: "${TZ:-UTC}"
-      # Optional healthchecks.io ping URL.
-      HEALTHCHECKS_URL: "${HEALTHCHECKS_URL:-}"
-      RUN_TIMEOUT: "${RUN_TIMEOUT:-2m}"
-      RUN_ONCE: "${RUN_ONCE:-false}"
-      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
-      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
-      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
-      # If enabled, bypasses cron, runs once, and exits.
-      # RUN_ONCE: "true"
-      # Credentials may be provided by env vars or workload identity.
-      # AWS_ACCESS_KEY_ID: your-access-key
-      # AWS_SECRET_ACCESS_KEY: your-secret-key
+    env_file: secrets.env
     secrets:
-      - age_passphrase
+      - source: passphrase
+        target: /age_passphrase.txt
     volumes:
-      - ./config.json:/data/config.json:ro
+      - config.json:/data/config.json:ro
+    restart: unless-stopped
 
 secrets:
-  age_passphrase:
+  passphrase:
     file: ./age_passphrase.txt

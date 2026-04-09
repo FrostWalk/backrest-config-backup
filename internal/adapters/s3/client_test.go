@@ -9,8 +9,10 @@ func TestNewClientWithEndpoint(t *testing.T) {
 	t.Parallel()
 
 	client, err := NewClient(context.Background(), ClientConfig{
-		Region:   "us-east-1",
-		Endpoint: "https://s3.example.com",
+		Region:          "us-east-1",
+		Endpoint:        "https://s3.example.com",
+		AccessKeyID:     "key-id",
+		SecretAccessKey: "secret-key",
 	})
 	if err != nil {
 		t.Fatalf("new s3 client: %v", err)

@@ -1,11 +1,9 @@
 services:
   backrest-config-backup:
-    platform: linux/amd64
+    container_name: backrest-config-backup
     build:
       context: .
       dockerfile: Dockerfile
-    image: backrest-config-backup:dev
-    restart: no
     env_file:
       - .env.dev
     secrets:
@@ -13,6 +11,7 @@ services:
         target: /age_passphrase.txt
     volumes:
       - ./config.json:/data/config.json:ro
+    restart: no
 
 secrets:
   age_passphrase:

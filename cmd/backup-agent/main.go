@@ -72,8 +72,11 @@ func run() error {
 	defer cancel()
 
 	client, err := s3adapter.NewClient(ctx, s3adapter.ClientConfig{
-		Region:   cfg.S3Region,
-		Endpoint: cfg.S3Endpoint,
+		Region:          cfg.S3Region,
+		Endpoint:        cfg.S3Endpoint,
+		AccessKeyID:     cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey,
+		SessionToken:    cfg.S3SessionToken,
 	})
 	if err != nil {
 		return fmt.Errorf("creating s3 client: %w", err)
