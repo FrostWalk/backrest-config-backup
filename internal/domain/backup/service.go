@@ -30,12 +30,11 @@ type ServiceConfig struct {
 }
 
 type RunResult struct {
-	Changed      bool
-	CurrentHash  string
-	UploadedKey  string
-	DeletedOld   bool
-	PreviousKey  string
-	SkippedEqual bool
+	Changed     bool
+	CurrentHash string
+	UploadedKey string
+	DeletedOld  bool
+	PreviousKey string
 }
 
 func NewService(cfg ServiceConfig) (*Service, error) {
@@ -81,10 +80,6 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 	}
 	if previous != nil {
 		result.PreviousKey = previous.ObjectKey
-	}
-	if previous != nil && previous.Hash != "" && previous.Hash == currentHash {
-		result.SkippedEqual = true
-		return result, nil
 	}
 
 	// 3) Encrypt locally with age.

@@ -9,21 +9,16 @@ import (
 	"time"
 
 	ageadapter "github.com/FrostWalk/backrest-config-backup/internal/adapters/age"
-	"github.com/FrostWalk/backrest-config-backup/internal/adapters/healthchecks"
 	"github.com/FrostWalk/backrest-config-backup/internal/adapters/localfile"
 	"github.com/FrostWalk/backrest-config-backup/internal/adapters/s3"
 	"github.com/FrostWalk/backrest-config-backup/internal/adapters/scheduler"
 	"github.com/FrostWalk/backrest-config-backup/internal/config"
 	"github.com/FrostWalk/backrest-config-backup/internal/domain/backup"
+	"github.com/FrostWalk/backrest-config-backup/internal/healthcheck"
 	"github.com/FrostWalk/backrest-config-backup/internal/observability"
 	"github.com/FrostWalk/backrest-config-backup/internal/version"
 	"go.uber.org/zap"
 )
-
-type healthchecksNotifier interface {
-	PingSuccess(ctx context.Context) error
-	PingFailure(ctx context.Context, reason string) error
-}
 
 func Run() error {
 	logger, err := observability.NewLogger()
@@ -84,11 +79,7 @@ func Run() error {
 	}
 
 	httpClient := &http.Client{Timeout: 10 * time.Second}
-	notifier := healthchecks.NewNotifier(httpClient, cfg.HealthchecksURL)
-	healthchecksEnabled := cfg.HealthchecksURL != ""
-	if !healthchecksEnabled {
-		logger.Info("healthchecks disabled; HEALTHCHECKS_URL not set")
-	}
+	reporter := healthcheck.NewReporter(httpClient, cfg.HealthchecksURL, logger)
 	cronScheduler := scheduler.NewCronScheduler(location, logger)
 
 	job := func(runParent context.Context) error {
@@ -108,19 +99,12 @@ func Run() error {
 				fields = append(fields, zap.Time("next_backup_at", nextRun))
 			}
 			logger.Error("backup run failed", fields...)
-			if healthchecksEnabled {
-				pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancelPing()
-				if pingErr := notifier.PingFailure(pingCtx, err.Error()); pingErr != nil {
-					logger.Error("failure ping failed", zap.Error(pingErr))
-				}
-			}
+			reporter.NotifyFailure(context.Background(), err.Error())
 			return err
 		}
 
 		fields := []zap.Field{
 			zap.Bool("changed", result.Changed),
-			zap.Bool("skipped_equal", result.SkippedEqual),
 			zap.String("uploaded_key", result.UploadedKey),
 			zap.String("previous_key", result.PreviousKey),
 			zap.Bool("deleted_old", result.DeletedOld),
@@ -131,7 +115,7 @@ func Run() error {
 		}
 		logger.Info("backup run succeeded", fields...)
 
-		if pingErr := sendSuccessPing(context.Background(), notifier, healthchecksEnabled, result, logger); pingErr != nil {
+		if pingErr := reporter.NotifySuccess(context.Background()); pingErr != nil {
 			return pingErr
 		}
 		return nil
@@ -158,25 +142,5 @@ func Run() error {
 	}
 
 	logger.Info("backup scheduler stopped")
-	return nil
-}
-
-func sendSuccessPing(ctx context.Context, notifier healthchecksNotifier, enabled bool, result backup.RunResult, logger *zap.Logger) error {
-	if !enabled {
-		return nil
-	}
-
-	pingCtx, cancelPing := context.WithTimeout(ctx, 10*time.Second)
-	defer cancelPing()
-	if pingErr := notifier.PingSuccess(pingCtx); pingErr != nil {
-		logger.Error(
-			"success ping failed",
-			zap.Error(pingErr),
-			zap.Bool("changed", result.Changed),
-			zap.Bool("skipped_equal", result.SkippedEqual),
-		)
-		return pingErr
-	}
-
 	return nil
 }
