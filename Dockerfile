@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
         -X github.com/FrostWalk/backrest-config-backup/internal/version.Version=${VERSION} \
         -X github.com/FrostWalk/backrest-config-backup/internal/version.Revision=${REVISION} \
         -X github.com/FrostWalk/backrest-config-backup/internal/version.BuildDate=${BUILD_DATE}" \
-      -o /out/backup-agent ./cmd/backup-agent
+      -o /out/agent ./cmd/agent
 
 FROM alpine:latest
 
@@ -35,8 +35,8 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-COPY --from=builder /out/backup-agent /usr/local/bin/backup-agent
+COPY --from=builder /out/agent /usr/local/bin/agent
 
 USER root
 
-ENTRYPOINT ["/usr/local/bin/backup-agent"]
+ENTRYPOINT ["/usr/local/bin/agent"]
