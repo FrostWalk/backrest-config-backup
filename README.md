@@ -62,6 +62,16 @@ Optional variables:
 docker compose up -d
 ```
 
+## Why runs as root
+
+This container runs as `root` so it can read a `config.json` produced by the official Backrest container without
+permission issues.
+
+Backrest's Docker image runs as the default container user and uses `/root` paths internally. Its config store writes
+`config.json` with mode `0600`, creates timestamped `config.json.bak.*` copies, then atomically rewrites the live file.
+In practice that makes the file application-managed and typically `root`-owned, so this backup container also runs as
+`root` when mounting the file read-only.
+
 ## Restore
 
 To restore a backup:
@@ -76,7 +86,10 @@ To decrypt using the [age CLI](https://github.com/FiloSottile/age):
 age -d -o config.json config-backup-YYYY-MM-DDTHH-mm-ss.json.age
 ```
 
-## Acknowledgment
+## Acknowledgments
 
-This service is built to protect Backrest configuration data. Thank you
-to [Backrest](https://github.com/garethgeorge/backrest) and [age](https://github.com/FiloSottile/age).
+This project exists to back up the Backrest configuration, which contains all credentials for restic repositories.
+Losing that file also means losing access to all backups. Thanks to
+[Backrest](https://github.com/garethgeorge/backrest) for providing an excellent UI and management layer for
+[restic](https://restic.net/), which provides the amazing backup engine,
+and [age](https://github.com/FiloSottile/age) for providing simple, solid file encryption.
