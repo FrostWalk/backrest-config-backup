@@ -1,0 +1,91 @@
+name: Feature Request
+description: Suggest an improvement or new capability for backrest-config-backup.
+title: "[Feature]: "
+type: feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+
+        Please keep the request focused on one idea and explain the user or operational problem it solves. If the request involves credentials, bucket layout, encryption, or healthcheck integrations, do not include secrets or sensitive infrastructure details.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight Checks
+      options:
+        - label: I searched existing issues and did not find the same request.
+          required: true
+        - label: This request describes a concrete problem, not only a proposed implementation.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to Solve
+      description: Describe the limitation, pain point, or use case.
+      placeholder: I need to keep more than one successful backup object because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the change you want to see.
+      placeholder: Add a retention setting that keeps the last N encrypted backups in the configured prefix.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: List any workarounds or alternative approaches you considered.
+      placeholder: I currently copy objects in the bucket after each run, but that adds external automation and is easy to misconfigure.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Backup behavior
+        - S3 storage compatibility
+        - Encryption
+        - Scheduling
+        - Healthchecks integration
+        - Docker or container image
+        - Configuration or environment variables
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Example Use Case
+      description: Explain how this would be used in practice.
+      placeholder: In a self-hosted setup using MinIO, I want to ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: config_impact
+    attributes:
+      label: Configuration or Operational Impact
+      description: Note any expected new environment variables, behavior changes, migration needs, or compatibility concerns.
+      placeholder: This could add an optional RETENTION_COUNT setting and should keep the current default behavior unchanged.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add links, examples, or related issues if they help explain the request.
+    validations:
+      required: false
