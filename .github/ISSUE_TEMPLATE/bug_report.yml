@@ -1,0 +1,125 @@
+name: Bug Report
+description: Report a reproducible problem with backrest-config-backup.
+title: "[Bug]: "
+type: bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.
+
+        Please keep the report focused on one problem and remove any secrets before submitting it. Do not include access keys, secret keys, passphrases, bucket contents, or live healthcheck URLs.
+
+        If you believe you found a security vulnerability, do not use this form. Report it privately to the maintainer first, as described in `CONTRIBUTING.md`.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight Checks
+      options:
+        - label: I searched existing issues and did not find a matching report.
+          required: true
+        - label: I removed or redacted secrets and other sensitive data from this report.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and the impact it has.
+      placeholder: The backup run failed during upload after reading config.json.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: A new encrypted object should have been uploaded to the configured bucket.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Provide the smallest reproducible sequence you can.
+      placeholder: |
+        1. Start the service with ...
+        2. Change config.json so that ...
+        3. Trigger a run with ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: How are you running the project?
+      options:
+        - Docker Compose
+        - docker-compose.dev.yml
+        - Prebuilt container image
+        - Local Go build
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or Revision
+      description: Provide the release tag, container image tag, or git revision. If available, copy the version/revision from the startup log.
+      placeholder: v0.1.0, ghcr.io/...:v0.1.0, or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, container runtime, and architecture if relevant.
+      placeholder: Ubuntu 24.04, Docker 28.x, linux/amd64
+    validations:
+      required: false
+
+  - type: input
+    id: s3_provider
+    attributes:
+      label: S3-Compatible Provider
+      description: Name the provider or implementation involved.
+      placeholder: AWS S3, MinIO, Cloudflare R2, Backblaze B2, Wasabi
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant Configuration
+      description: List the non-sensitive settings that matter for reproducing the problem. Do not paste secrets.
+      placeholder: |
+        RUN_ONCE=true
+        TZ=Europe/Rome
+        AWS_REGION=us-east-1
+        S3_PREFIX=backrest
+        HEALTHCHECKS_URL=(redacted or omitted)
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: Paste the relevant logs or error messages. This field is automatically formatted.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add anything else that may help triage the issue.
+      placeholder: This only happens against providers without object versioning support.
+    validations:
+      required: false

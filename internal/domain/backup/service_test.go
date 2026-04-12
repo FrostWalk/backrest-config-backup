@@ -79,7 +79,7 @@ func (f fakeClock) Now() time.Time {
 	return f.now
 }
 
-func TestServiceRunUnchangedHashSkipsUploadAndDelete(t *testing.T) {
+func TestServiceRunUnchangedHashStillUploadsAndDeletesPrevious(t *testing.T) {
 	t.Parallel()
 
 	data := []byte(`{"hello":"world"}`)
@@ -107,17 +107,17 @@ func TestServiceRunUnchangedHashSkipsUploadAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if !result.SkippedEqual {
-		t.Fatalf("expected skipped equal true")
+	if !result.Changed {
+		t.Fatalf("expected changed true")
 	}
-	if store.uploaded {
-		t.Fatalf("expected upload not called")
+	if !store.uploaded {
+		t.Fatalf("expected upload called")
 	}
-	if store.deleted > 0 {
-		t.Fatalf("expected delete not called")
+	if store.deleted == 0 {
+		t.Fatalf("expected cleanup called")
 	}
-	if encryptor.calls != 0 {
-		t.Fatalf("expected encrypt not called")
+	if encryptor.calls != 1 {
+		t.Fatalf("expected encrypt called once, got %d", encryptor.calls)
 	}
 }
 
