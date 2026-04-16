@@ -24,7 +24,7 @@ ARG VERSION=dev
 ARG REVISION=unknown
 
 LABEL org.opencontainers.image.title="backrest-config-backup"
-LABEL org.opencontainers.image.description="Encrypted client-side backups of Backrest config.json to S3-compatible storage."
+LABEL org.opencontainers.image.description="Encrypted backups of Backrest config.json to S3-compatible storage."
 LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.revision="${REVISION}"
