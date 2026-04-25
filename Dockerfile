@@ -1,4 +1,4 @@
-FROM golang:alpine AS builder
+FROM golang:1.26.2-alpine AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
         -X github.com/FrostWalk/backrest-config-backup/internal/version.BuildDate=${BUILD_DATE}" \
       -o /out/agent ./cmd/agent
 
-FROM alpine:latest
+FROM alpine:3.23.4
 
 ARG VERSION=dev
 ARG REVISION=unknown
