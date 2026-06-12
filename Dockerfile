@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath \
         -X github.com/FrostWalk/backrest-config-backup/internal/version.BuildDate=${BUILD_DATE}" \
       -o /out/agent ./cmd/agent
 
-FROM alpine:3.23.4
+FROM alpine:3.24.0
 
 ARG VERSION=dev
 ARG REVISION=unknown
