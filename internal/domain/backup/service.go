@@ -49,7 +49,6 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		return nil, errors.New("clock is required")
 	case cfg.Location == nil:
 		return nil, errors.New("location is required")
-	default:
 	}
 
 	return &Service{
@@ -65,7 +64,6 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 func (s *Service) Run(ctx context.Context) (RunResult, error) {
 	var result RunResult
 
-	// 1) Calculate hash of current configuration.
 	plaintext, err := s.configSource.ReadConfig(ctx)
 	if err != nil {
 		return result, fmt.Errorf("reading configuration: %w", err)
@@ -73,7 +71,6 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 	currentHash := hashBytes(plaintext)
 	result.CurrentHash = currentHash
 
-	// 2) Compare hash against previous uploaded backup metadata.
 	previous, err := s.store.GetLatestBackup(ctx)
 	if err != nil {
 		return result, fmt.Errorf("getting latest backup metadata: %w", err)
@@ -82,30 +79,25 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 		result.PreviousKey = previous.ObjectKey
 	}
 
-	// 3) Encrypt locally with age.
 	encrypted, err := s.encryptor.Encrypt(ctx, plaintext)
 	if err != nil {
 		return result, fmt.Errorf("encrypting configuration: %w", err)
 	}
 
-	// 4) Upload new encrypted backup.
 	key := s.buildBackupObjectKey(s.clock.Now().In(s.location))
 	if err := s.store.UploadBackup(ctx, key, encrypted, currentHash); err != nil {
 		return result, fmt.Errorf("uploading encrypted backup: %w", err)
 	}
 
-	// 5) Delete old backup, only after successful upload.
+	// Keep previous backups until the new upload has succeeded.
 	result.Changed = true
 	result.UploadedKey = key
 	deletedCount, err := s.store.CleanupBackups(ctx, key)
 	if err != nil {
 		return result, fmt.Errorf("cleaning up old backups while keeping %q: %w", key, err)
 	}
-	if deletedCount > 0 {
-		result.DeletedOld = true
-	}
+	result.DeletedOld = deletedCount > 0
 
-	// 6) End.
 	return result, nil
 }
 

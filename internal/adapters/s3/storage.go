@@ -3,8 +3,9 @@ package s3adapter
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"sort"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 type Storage struct {
@@ -37,17 +40,14 @@ func (s *Storage) GetLatestBackup(ctx context.Context) (*backup.StoredBackup, er
 		return nil, nil
 	}
 
-	sort.Slice(objects, func(i, j int) bool {
-		if objects[i].LastModified == nil {
-			return false
+	latest := objects[0]
+	for _, object := range objects[1:] {
+		if object.LastModified != nil && (latest.LastModified == nil || object.LastModified.After(*latest.LastModified)) {
+			latest = object
 		}
-		if objects[j].LastModified == nil {
-			return true
-		}
-		return objects[i].LastModified.After(*objects[j].LastModified)
-	})
+	}
 
-	key := aws.ToString(objects[0].Key)
+	key := aws.ToString(latest.Key)
 	head, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -78,27 +78,14 @@ func (s *Storage) UploadBackup(ctx context.Context, objectKey string, encrypted 
 	return nil
 }
 
-func (s *Storage) CleanupBackups(ctx context.Context, keepObjectKey string) (int, error) {
-	deletedCount, err := s.cleanupUsingObjectVersions(ctx, keepObjectKey)
-	if err == nil {
-		return deletedCount, nil
-	}
-	// Fallback for providers without ListObjectVersions support.
-	return s.cleanupUsingObjectList(ctx, keepObjectKey)
-}
-
-func (s *Storage) listAllObjects(ctx context.Context) ([]s3typesObject, error) {
-	var (
-		token   *string
-		objects []s3typesObject
-	)
-
-	for {
-		output, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-			Bucket:            aws.String(s.bucket),
-			Prefix:            aws.String(s.fullPrefix()),
-			ContinuationToken: token,
-		})
+func (s *Storage) listAllObjects(ctx context.Context) ([]s3types.Object, error) {
+	pages := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucket),
+		Prefix: aws.String(s.fullPrefix()),
+	})
+	var objects []s3types.Object
+	for pages.HasMorePages() {
+		output, err := pages.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("list objects under prefix %q: %w", s.fullPrefix(), err)
 		}
@@ -106,17 +93,9 @@ func (s *Storage) listAllObjects(ctx context.Context) ([]s3typesObject, error) {
 		for _, item := range output.Contents {
 			key := aws.ToString(item.Key)
 			if strings.HasSuffix(key, ".json.age") {
-				objects = append(objects, s3typesObject{
-					Key:          item.Key,
-					LastModified: item.LastModified,
-				})
+				objects = append(objects, item)
 			}
 		}
-
-		if !aws.ToBool(output.IsTruncated) {
-			break
-		}
-		token = output.NextContinuationToken
 	}
 
 	return objects, nil
@@ -129,21 +108,19 @@ func (s *Storage) fullPrefix() string {
 	return s.prefix + "/"
 }
 
-func (s *Storage) cleanupUsingObjectVersions(ctx context.Context, keepObjectKey string) (int, error) {
-	var (
-		keyMarker       *string
-		versionIDMarker *string
-		objectsToDelete []s3types.ObjectIdentifier
-	)
-
-	for {
-		output, err := s.client.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{
-			Bucket:          aws.String(s.bucket),
-			Prefix:          aws.String(s.fullPrefix()),
-			KeyMarker:       keyMarker,
-			VersionIdMarker: versionIDMarker,
-		})
+func (s *Storage) CleanupBackups(ctx context.Context, keepObjectKey string) (int, error) {
+	pages := s3.NewListObjectVersionsPaginator(s.client, &s3.ListObjectVersionsInput{
+		Bucket: aws.String(s.bucket),
+		Prefix: aws.String(s.fullPrefix()),
+	})
+	var objectsToDelete []s3types.ObjectIdentifier
+	for pages.HasMorePages() {
+		output, err := pages.NextPage(ctx)
 		if err != nil {
+			// Only unsupported version listing permits falling back to unversioned cleanup.
+			if versionListingUnsupported(err) {
+				return s.cleanupUsingObjectList(ctx, keepObjectKey)
+			}
 			return 0, fmt.Errorf("list object versions under prefix %q: %w", s.fullPrefix(), err)
 		}
 
@@ -168,18 +145,9 @@ func (s *Storage) cleanupUsingObjectVersions(ctx context.Context, keepObjectKey 
 				VersionId: marker.VersionId,
 			})
 		}
-
-		if !aws.ToBool(output.IsTruncated) {
-			break
-		}
-		keyMarker = output.NextKeyMarker
-		versionIDMarker = output.NextVersionIdMarker
 	}
 
-	if len(objectsToDelete) == 0 {
-		return 0, nil
-	}
-
+	// Finish listing before deleting so mutations cannot invalidate pagination markers.
 	deletedCount := 0
 	for _, object := range objectsToDelete {
 		_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -195,6 +163,19 @@ func (s *Storage) cleanupUsingObjectVersions(ctx context.Context, keepObjectKey 
 	return deletedCount, nil
 }
 
+func versionListingUnsupported(err error) bool {
+	if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
+		switch apiErr.ErrorCode() {
+		case "NotImplemented", "MethodNotAllowed":
+			return true
+		}
+	}
+	if responseErr, ok := errors.AsType[*smithyhttp.ResponseError](err); ok {
+		return responseErr.HTTPStatusCode() == http.StatusNotImplemented || responseErr.HTTPStatusCode() == http.StatusMethodNotAllowed
+	}
+	return false
+}
+
 func (s *Storage) cleanupUsingObjectList(ctx context.Context, keepObjectKey string) (int, error) {
 	objects, err := s.listAllObjects(ctx)
 	if err != nil {
@@ -202,6 +183,7 @@ func (s *Storage) cleanupUsingObjectList(ctx context.Context, keepObjectKey stri
 	}
 
 	deletedCount := 0
+	waiter := s3.NewObjectNotExistsWaiter(s.client)
 	for _, object := range objects {
 		key := aws.ToString(object.Key)
 		if key == keepObjectKey {
@@ -215,7 +197,6 @@ func (s *Storage) cleanupUsingObjectList(ctx context.Context, keepObjectKey stri
 			return deletedCount, fmt.Errorf("delete object %q: %w", key, err)
 		}
 
-		waiter := s3.NewObjectNotExistsWaiter(s.client)
 		if err := waiter.Wait(ctx, &s3.HeadObjectInput{
 			Bucket: aws.String(s.bucket),
 			Key:    aws.String(key),
@@ -226,9 +207,4 @@ func (s *Storage) cleanupUsingObjectList(ctx context.Context, keepObjectKey stri
 	}
 
 	return deletedCount, nil
-}
-
-type s3typesObject struct {
-	Key          *string
-	LastModified *time.Time
 }

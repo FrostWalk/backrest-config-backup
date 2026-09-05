@@ -15,10 +15,8 @@ func NewConfigSource(path string) *ConfigSource {
 }
 
 func (s *ConfigSource) ReadConfig(ctx context.Context) ([]byte, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	content, err := os.ReadFile(s.path)

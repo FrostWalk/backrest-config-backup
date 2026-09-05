@@ -2,16 +2,20 @@
 
 Backs up Backrest `config.json` to an S3-compatible object store.
 
-On each run, the service reads the local config file, computes its SHA-512 hash, compares it with the latest uploaded
-backup, and skips the upload if nothing changed. When the file changed, it encrypts the content locally
-with [age](https://github.com/FiloSottile/age), uploads the new object, removes older backups after a successful upload,
-and sends a [Healthchecks](https://healthchecks.io/) ping.
+On each run, the service reads the local config file, computes its SHA-512 hash, and encrypts the content locally
+with [age](https://github.com/FiloSottile/age). It uploads a backup with the hash stored in object metadata, even if the
+file has not changed, removes older backups after a successful upload, and sends an optional
+[Healthchecks](https://healthchecks.io/) ping.
 
 ## Requirements
 
 - A Backrest `config.json` file
 - An S3-compatible bucket
 - An `age` passphrase file
+
+Cleanup requires permission to list and delete object versions when the provider supports version listing.
+For providers without that API, it falls back to listing and deleting objects. Permission and deletion errors
+are reported as backup failures.
 
 ## Configuration
 

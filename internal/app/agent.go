@@ -115,10 +115,7 @@ func Run() error {
 		}
 		logger.Info("backup run succeeded", fields...)
 
-		if pingErr := reporter.NotifySuccess(context.Background()); pingErr != nil {
-			return pingErr
-		}
-		return nil
+		return reporter.NotifySuccess(context.Background())
 	}
 
 	if cfg.RunOnce {

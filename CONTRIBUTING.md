@@ -34,7 +34,7 @@ Because this project handles backup configuration and credentials, redact secret
 
 ## Development Setup
 
-The repository uses Go. The version in [go.mod](go.mod) is the source of truth.
+The repository requires Go 1.27.1 or newer. The version in [go.mod](go.mod) is the source of truth for local builds and CI.
 
 Typical setup:
 
@@ -64,7 +64,9 @@ Useful commands:
 
 ```bash
 gofmt -w .
-go test ./...
+go mod tidy -diff
+go vet ./...
+go test -race ./...
 ```
 
 Integration tests are opt-in:
@@ -96,7 +98,8 @@ When opening a pull request:
 
 Before submitting, make sure:
 
-- `go test ./...` passes.
+- `go vet ./...` and `go test -race ./...` pass.
+- `go mod tidy -diff` reports no changes.
 - Code is formatted with `gofmt`.
 - No secrets, credentials, or environment-specific files are included in the diff.
 

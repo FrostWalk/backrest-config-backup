@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -37,10 +36,8 @@ func NewEncryptor(passphraseFile string) (*Encryptor, error) {
 }
 
 func (e *Encryptor) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	var encrypted bytes.Buffer
@@ -49,7 +46,7 @@ func (e *Encryptor) Encrypt(ctx context.Context, plaintext []byte) ([]byte, erro
 		return nil, fmt.Errorf("creating age encrypt writer: %w", err)
 	}
 
-	if _, err := io.Copy(writer, bytes.NewReader(plaintext)); err != nil {
+	if _, err := writer.Write(plaintext); err != nil {
 		return nil, fmt.Errorf("writing plaintext to age stream: %w", err)
 	}
 	if err := writer.Close(); err != nil {

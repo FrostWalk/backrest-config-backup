@@ -17,8 +17,7 @@ func TestCronSchedulerStartInvalidSpec(t *testing.T) {
 	}
 
 	s := NewCronScheduler(location, zap.NewNop())
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err = s.Start(ctx, "not-a-valid-spec", func(context.Context) error { return nil })
 	if err == nil {

@@ -1,6 +1,6 @@
 module github.com/FrostWalk/backrest-config-backup
 
-go 1.26
+go 1.27.1
 
 require (
 	filippo.io/age v1.3.1
@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.2
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.110.0
+	github.com/aws/smithy-go v1.28.1
 	github.com/robfig/cron/v3 v3.0.1
 	go.uber.org/zap v1.28.0
 )
@@ -27,7 +28,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.36.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.41.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.48.0 // indirect
-	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
