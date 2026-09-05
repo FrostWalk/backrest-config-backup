@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
@@ -12,21 +13,25 @@ import (
 )
 
 type Service struct {
-	configSource ConfigSource
-	encryptor    Encryptor
-	store        Store
-	clock        Clock
-	location     *time.Location
-	keyPrefix    string
+	configSource      ConfigSource
+	encryptor         Encryptor
+	decryptor         Decryptor
+	store             Store
+	clock             Clock
+	location          *time.Location
+	keyPrefix         string
+	verifyAfterUpload bool
 }
 
 type ServiceConfig struct {
-	ConfigSource ConfigSource
-	Encryptor    Encryptor
-	Store        Store
-	Clock        Clock
-	Location     *time.Location
-	KeyPrefix    string
+	ConfigSource      ConfigSource
+	Encryptor         Encryptor
+	Decryptor         Decryptor
+	Store             Store
+	Clock             Clock
+	Location          *time.Location
+	KeyPrefix         string
+	VerifyAfterUpload bool
 }
 
 type RunResult struct {
@@ -35,6 +40,7 @@ type RunResult struct {
 	UploadedKey string
 	DeletedOld  bool
 	PreviousKey string
+	Verified    bool
 }
 
 func NewService(cfg ServiceConfig) (*Service, error) {
@@ -49,15 +55,19 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		return nil, errors.New("clock is required")
 	case cfg.Location == nil:
 		return nil, errors.New("location is required")
+	case cfg.VerifyAfterUpload && cfg.Decryptor == nil:
+		return nil, errors.New("decryptor is required when verification is enabled")
 	}
 
 	return &Service{
-		configSource: cfg.ConfigSource,
-		encryptor:    cfg.Encryptor,
-		store:        cfg.Store,
-		clock:        cfg.Clock,
-		location:     cfg.Location,
-		keyPrefix:    strings.Trim(strings.TrimSpace(cfg.KeyPrefix), "/"),
+		configSource:      cfg.ConfigSource,
+		encryptor:         cfg.Encryptor,
+		decryptor:         cfg.Decryptor,
+		store:             cfg.Store,
+		clock:             cfg.Clock,
+		location:          cfg.Location,
+		keyPrefix:         strings.Trim(strings.TrimSpace(cfg.KeyPrefix), "/"),
+		verifyAfterUpload: cfg.VerifyAfterUpload,
 	}, nil
 }
 
@@ -89,9 +99,16 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 		return result, fmt.Errorf("uploading encrypted backup: %w", err)
 	}
 
-	// Keep previous backups until the new upload has succeeded.
 	result.Changed = true
 	result.UploadedKey = key
+	if s.verifyAfterUpload {
+		if err := s.verifyBackup(ctx, key, currentHash); err != nil {
+			return result, fmt.Errorf("verifying uploaded backup %q: %w", key, err)
+		}
+		result.Verified = true
+	}
+
+	// Keep previous backups until upload and any requested verification succeed.
 	deletedCount, err := s.store.CleanupBackups(ctx, key)
 	if err != nil {
 		return result, fmt.Errorf("cleaning up old backups while keeping %q: %w", key, err)
@@ -101,8 +118,29 @@ func (s *Service) Run(ctx context.Context) (RunResult, error) {
 	return result, nil
 }
 
+func (s *Service) verifyBackup(ctx context.Context, key, expectedHash string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	encrypted, err := s.store.DownloadBackup(ctx, key)
+	if err != nil {
+		return fmt.Errorf("downloading backup: %w", err)
+	}
+	restored, err := s.decryptor.Decrypt(ctx, encrypted)
+	if err != nil {
+		return fmt.Errorf("decrypting backup: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if hashBytes(restored) != expectedHash {
+		return errors.New("restored configuration hash does not match the original snapshot")
+	}
+	return nil
+}
+
 func (s *Service) buildBackupObjectKey(now time.Time) string {
-	filename := "config-backup-" + now.Format("2006-01-02T15-04-05") + ".json.age"
+	filename := "config-backup-" + now.Format("2006-01-02T15-04-05") + "-" + rand.Text() + ".json.age"
 	if s.keyPrefix == "" {
 		return filename
 	}

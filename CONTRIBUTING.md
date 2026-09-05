@@ -69,17 +69,30 @@ go vet ./...
 go test -race ./...
 ```
 
-Integration tests are opt-in:
+The default test suite includes restore verification with real age encryption and simulated S3 and Healthchecks
+servers. It covers corrupted and truncated ciphertext, incorrect passphrases, hash mismatches, timeouts, and
+preservation of older backups when verification fails.
+
+The real S3 backup/restore integration test is opt-in:
 
 ```bash
-go test -tags=integration ./...
+go test -tags=integration -run TestStorageBackupRestoreIntegration -count=1 -v ./internal/adapters/s3
 ```
 
-Current integration coverage in this repository expects these environment variables when applicable:
+Export these variables for a dedicated test bucket:
 
 - `INTEGRATION_S3_BUCKET`
 - `INTEGRATION_AWS_REGION`
+- `INTEGRATION_S3_ACCESS_KEY_ID`
+- `INTEGRATION_S3_SECRET_ACCESS_KEY`
 - `INTEGRATION_S3_ENDPOINT` (optional depending on provider)
+- `INTEGRATION_S3_SESSION_TOKEN` (optional for temporary credentials)
+
+The test skips when required variables are missing. It uses a synthetic configuration, a temporary passphrase,
+and a fresh `backrest-config-backup-test/<random>/` prefix. It performs two verified backups, checks that only the
+newest remains, then downloads and restores it using a fresh decryptor. Test objects and versions are removed
+from that prefix afterward. The test credentials need object read/write/delete and listing permissions,
+including version listing and deletion when supported by the provider.
 
 ## Pull Request Guidelines
 

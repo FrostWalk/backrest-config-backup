@@ -4,7 +4,7 @@ Backs up Backrest `config.json` to an S3-compatible object store.
 
 On each run, the service reads the local config file, computes its SHA-512 hash, and encrypts the content locally
 with [age](https://github.com/FiloSottile/age). It uploads a backup with the hash stored in object metadata, even if the
-file has not changed, removes older backups after a successful upload, and sends an optional
+file has not changed, optionally verifies recovery, removes older backups after a successful run, and sends an optional
 [Healthchecks](https://healthchecks.io/) ping.
 
 ## Requirements
@@ -38,6 +38,7 @@ Optional variables:
 - `TZ` defaults to `UTC`
 - `RUN_TIMEOUT` defaults to `2m`
 - `RUN_ONCE` defaults to `false`
+- `VERIFY_AFTER_UPLOAD` defaults to `false`; when enabled, verifies the restored SHA-512 hash before cleanup
 - `S3_SESSION_TOKEN` if required by your provider
 - `HEALTHCHECKS_URL` is optional; when unset, healthchecks pings are disabled
 
@@ -51,7 +52,7 @@ Optional variables:
     - `S3_SECRET_ACCESS_KEY`
     - `AGE_PASSPHRASE_FILE`
     - `CRON_SCHEDULE` (or `RUN_ONCE=true`)
-    - optional: `HEALTHCHECKS_URL`, `S3_PREFIX`, `AWS_REGION`, `TZ`, `RUN_TIMEOUT`, `S3_SESSION_TOKEN`
+    - optional: `HEALTHCHECKS_URL`, `S3_PREFIX`, `AWS_REGION`, `TZ`, `RUN_TIMEOUT`, `VERIFY_AFTER_UPLOAD`, `S3_SESSION_TOKEN`
 2. Put your Backrest config where you want and mount it read-only in `docker-compose.yml`.
     - host path example: `./config.json`
     - container path example: `/data/config.json`
@@ -76,6 +77,30 @@ Backrest's Docker image runs as the default container user and uses `/root` path
 In practice that makes the file application-managed and typically `root`-owned, so this backup container also runs as
 `root` when mounting the file read-only.
 
+## Verify Backup Recovery
+
+Set `VERIFY_AFTER_UPLOAD=true` to download each newly uploaded object, fully decrypt it with the configured
+passphrase, and compare its SHA-512 hash with the hash of the original configuration snapshot. The original
+snapshot hash is used even if the live file changes during the run. Verification keeps plaintext in memory and
+leaves the live configuration untouched.
+
+Older backups are deleted only after verification succeeds. A download, decryption, hash mismatch, or timeout
+failure preserves older backups and the newly uploaded object, logs the failed stage and object key, and sends
+a failure healthcheck when configured. Successful verification is logged as `"verified":true`.
+
+For a one-time backup and recovery check, with the required environment variables already exported:
+
+```bash
+RUN_ONCE=true VERIFY_AFTER_UPLOAD=true go run ./cmd/agent
+```
+
+The command exits with a nonzero status on failure. This performs a normal backup, including cleanup after
+successful verification. Use a separate `S3_PREFIX` to isolate a test run from your normal backups.
+
+Verification requires permission to download objects (`s3:GetObject`) and adds a download and decryption to each
+run. These steps share `RUN_TIMEOUT` with the rest of the backup; increase it if necessary. This checks recovery
+of the configuration file; it does not start Backrest with that configuration.
+
 ## Restore
 
 To restore a backup:
@@ -87,8 +112,11 @@ To restore a backup:
 To decrypt using the [age CLI](https://github.com/FiloSottile/age):
 
 ```bash
-age -d -o config.json config-backup-YYYY-MM-DDTHH-mm-ss.json.age
+age -d -o config.json config-backup-YYYY-MM-DDTHH-mm-ss-RANDOM.json.age
 ```
+
+New backup names include a random suffix so consecutive runs cannot overwrite a previous backup before
+verification. Backups using the older timestamp-only names can still be restored with the same command.
 
 ## Acknowledgments
 

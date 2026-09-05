@@ -1,6 +1,9 @@
 package s3adapter
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"io"
 	"maps"
 	"net/http"
@@ -8,6 +11,7 @@ import (
 	"net/url"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -29,6 +33,91 @@ func TestStorageFullPrefixEmpty(t *testing.T) {
 	storage := NewStorage(nil, "bucket", "")
 	if got := storage.fullPrefix(); got != "" {
 		t.Fatalf("expected empty prefix, got %q", got)
+	}
+}
+
+func TestStorageDownloadBackup(t *testing.T) {
+	t.Parallel()
+
+	ciphertext := []byte("encrypted\x00config\xff")
+	storage := newTestStorage(t, []s3Response{{
+		method: http.MethodGet,
+		target: "/bucket/backrest/backup.json.age",
+		body:   string(ciphertext),
+	}})
+	content, err := storage.DownloadBackup(t.Context(), "backrest/backup.json.age")
+	if err != nil || !bytes.Equal(content, ciphertext) {
+		t.Fatalf("download mismatch: %v", err)
+	}
+}
+
+func TestStorageDownloadBackupErrors(t *testing.T) {
+	t.Parallel()
+
+	for _, status := range []int{http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			t.Parallel()
+			storage := newTestStorage(t, []s3Response{{
+				method: http.MethodGet,
+				target: "/bucket/backrest/backup.json.age",
+				status: status,
+			}})
+			content, err := storage.DownloadBackup(t.Context(), "backrest/backup.json.age")
+			if err == nil || content != nil {
+				t.Fatalf("expected download failure, got %v", err)
+			}
+		})
+	}
+}
+
+func TestStorageDownloadBackupTruncatedResponse(t *testing.T) {
+	t.Parallel()
+
+	storage := newTestStorage(t, []s3Response{{
+		method:  http.MethodGet,
+		target:  "/bucket/backrest/backup.json.age",
+		headers: http.Header{"Content-Length": {"100"}},
+		body:    "partial",
+	}})
+	content, err := storage.DownloadBackup(t.Context(), "backrest/backup.json.age")
+	if !errors.Is(err, io.ErrUnexpectedEOF) || content != nil {
+		t.Fatalf("expected incomplete download without partial content, got %v", err)
+	}
+}
+
+func TestStorageDownloadBackupCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	storage := newTestStorage(t, nil)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	content, err := storage.DownloadBackup(ctx, "backrest/backup.json.age")
+	if !errors.Is(err, context.Canceled) || content != nil {
+		t.Fatalf("expected canceled download, got %v", err)
+	}
+}
+
+func TestStorageDownloadBackupTimeout(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		_, _ = io.WriteString(w, "partial")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+	client := s3.New(s3.Options{
+		Region: "us-east-1", BaseEndpoint: aws.String(server.URL), UsePathStyle: true,
+		Credentials: credentials.NewStaticCredentialsProvider("test-key", "test-secret", ""),
+		Retryer:     aws.NopRetryer{}, HTTPClient: server.Client(),
+	})
+	storage := NewStorage(client, "bucket", "backrest")
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	content, err := storage.DownloadBackup(ctx, "backrest/backup.json.age")
+	if !errors.Is(err, context.DeadlineExceeded) || content != nil {
+		t.Fatalf("expected download timeout without partial content, got %v", err)
 	}
 }
 

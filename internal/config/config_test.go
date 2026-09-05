@@ -106,3 +106,44 @@ func TestLoadFromEnvRequiresS3StaticCredentials(t *testing.T) {
 		t.Fatalf("expected S3_SECRET_ACCESS_KEY required error, got: %v", err)
 	}
 }
+
+func TestLoadFromEnvVerifyAfterUpload(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		value   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "default disabled"},
+		{name: "explicit disabled", value: "false"},
+		{name: "enabled", value: " true ", want: true},
+		{name: "invalid", value: "sometimes", wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for key, value := range map[string]string{
+				"CONFIG_PATH":          "/data/config.json",
+				"S3_BUCKET":            "bucket",
+				"S3_ENDPOINT":          "https://s3.example.com",
+				"S3_ACCESS_KEY_ID":     "key-id",
+				"S3_SECRET_ACCESS_KEY": "secret-key",
+				"AGE_PASSPHRASE_FILE":  "/run/secrets/age_passphrase",
+				"CRON_SCHEDULE":        "",
+				"RUN_ONCE":             "true",
+				"RUN_TIMEOUT":          "",
+				"VERIFY_AFTER_UPLOAD":  tt.value,
+			} {
+				t.Setenv(key, value)
+			}
+			cfg, err := LoadFromEnv()
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "VERIFY_AFTER_UPLOAD") {
+					t.Fatalf("expected VERIFY_AFTER_UPLOAD parsing error, got %v", err)
+				}
+				return
+			}
+			if err != nil || cfg.VerifyAfterUpload != tt.want {
+				t.Fatalf("expected verification %t, got %t, %v", tt.want, cfg.VerifyAfterUpload, err)
+			}
+		})
+	}
+}

@@ -30,6 +30,7 @@ type Config struct {
 	HealthchecksURL   string
 	RunTimeout        time.Duration
 	RunOnce           bool
+	VerifyAfterUpload bool
 }
 
 func LoadFromEnv() (Config, error) {
@@ -55,6 +56,14 @@ func LoadFromEnv() (Config, error) {
 			return Config{}, fmt.Errorf("parsing RUN_ONCE: %w", err)
 		}
 		cfg.RunOnce = value
+	}
+
+	if raw := strings.TrimSpace(os.Getenv("VERIFY_AFTER_UPLOAD")); raw != "" {
+		value, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("parsing VERIFY_AFTER_UPLOAD: %w", err)
+		}
+		cfg.VerifyAfterUpload = value
 	}
 
 	if raw := strings.TrimSpace(os.Getenv("RUN_TIMEOUT")); raw != "" {

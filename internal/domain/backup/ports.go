@@ -15,9 +15,14 @@ type Encryptor interface {
 	Encrypt(ctx context.Context, plaintext []byte) ([]byte, error)
 }
 
+type Decryptor interface {
+	Decrypt(ctx context.Context, encrypted []byte) ([]byte, error)
+}
+
 type Store interface {
 	GetLatestBackup(ctx context.Context) (*StoredBackup, error)
 	UploadBackup(ctx context.Context, objectKey string, encrypted []byte, configHash string) error
+	DownloadBackup(ctx context.Context, objectKey string) ([]byte, error)
 	CleanupBackups(ctx context.Context, keepObjectKey string) (int, error)
 }
 

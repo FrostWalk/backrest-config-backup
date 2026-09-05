@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -76,6 +77,23 @@ func (s *Storage) UploadBackup(ctx context.Context, objectKey string, encrypted 
 		return fmt.Errorf("put object %q: %w", objectKey, err)
 	}
 	return nil
+}
+
+func (s *Storage) DownloadBackup(ctx context.Context, objectKey string) ([]byte, error) {
+	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(objectKey),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get object %q: %w", objectKey, err)
+	}
+	defer output.Body.Close()
+
+	content, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading object %q: %w", objectKey, err)
+	}
+	return content, nil
 }
 
 func (s *Storage) listAllObjects(ctx context.Context) ([]s3types.Object, error) {

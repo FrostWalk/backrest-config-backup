@@ -67,12 +67,14 @@ func Run() error {
 	}
 
 	service, err := backup.NewService(backup.ServiceConfig{
-		ConfigSource: localfile.NewConfigSource(cfg.ConfigPath),
-		Encryptor:    encryptor,
-		Store:        store,
-		Clock:        backup.NewRealClock(),
-		Location:     location,
-		KeyPrefix:    cfg.S3Prefix,
+		ConfigSource:      localfile.NewConfigSource(cfg.ConfigPath),
+		Encryptor:         encryptor,
+		Decryptor:         encryptor,
+		Store:             store,
+		Clock:             backup.NewRealClock(),
+		Location:          location,
+		KeyPrefix:         cfg.S3Prefix,
+		VerifyAfterUpload: cfg.VerifyAfterUpload,
 	})
 	if err != nil {
 		return fmt.Errorf("creating backup service: %w", err)
@@ -93,6 +95,8 @@ func Run() error {
 		if err != nil {
 			fields := []zap.Field{
 				zap.Error(err),
+				zap.String("uploaded_key", result.UploadedKey),
+				zap.Bool("verified", result.Verified),
 				zap.Duration("duration", duration),
 			}
 			if nextRunErr == nil {
@@ -105,6 +109,7 @@ func Run() error {
 
 		fields := []zap.Field{
 			zap.Bool("changed", result.Changed),
+			zap.Bool("verified", result.Verified),
 			zap.String("uploaded_key", result.UploadedKey),
 			zap.String("previous_key", result.PreviousKey),
 			zap.Bool("deleted_old", result.DeletedOld),
